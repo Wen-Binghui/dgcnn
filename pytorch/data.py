@@ -30,7 +30,7 @@ def download():
 
 
 def load_data(partition):
-    download()
+    # download()
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(BASE_DIR, 'data')
     all_data = []
@@ -80,6 +80,7 @@ class ModelNet40(Dataset):
 
 
 if __name__ == '__main__':
+    # download()
     train = ModelNet40(1024)
     test = ModelNet40(1024, 'test')
     for data, label in train:

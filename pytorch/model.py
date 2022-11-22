@@ -18,7 +18,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def knn(x, k):
+def knn(x: torch.Tensor, k):
     inner = -2*torch.matmul(x.transpose(2, 1), x)
     xx = torch.sum(x**2, dim=1, keepdim=True)
     pairwise_distance = -xx - inner - xx.transpose(2, 1)
@@ -28,9 +28,10 @@ def knn(x, k):
 
 
 def get_graph_feature(x, k=20, idx=None):
+    # input size B*F*N ?
     batch_size = x.size(0)
     num_points = x.size(2)
-    x = x.view(batch_size, -1, num_points)
+    x = x.view(batch_size, -1, num_points)  # input size B*F*N 没变吧
     if idx is None:
         idx = knn(x, k=k)   # (batch_size, num_points, k)
     device = torch.device('cuda')
@@ -121,6 +122,7 @@ class DGCNN(nn.Module):
         self.linear3 = nn.Linear(256, output_channels)
 
     def forward(self, x):
+        # input size B*3*N
         batch_size = x.size(0)
         x = get_graph_feature(x, k=self.k)
         x = self.conv1(x)

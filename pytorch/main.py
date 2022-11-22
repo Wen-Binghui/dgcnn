@@ -153,7 +153,7 @@ def test(args, io):
     for data, label in test_loader:
 
         data, label = data.to(device), label.to(device).squeeze()
-        data = data.permute(0, 2, 1)
+        data = data.permute(0, 2, 1) # 变成 B*3*N
         batch_size = data.size()[0]
         logits = model(data)
         preds = logits.max(dim=1)[1]
