@@ -1,6 +1,11 @@
 # Dynamic Graph CNN for Learning on Point Clouds (PyTorch)
+只是分类!
+
 
 ## Point Cloud Classification
+
+
+
 * Run the training script:
 
 
