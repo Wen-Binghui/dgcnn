@@ -19,36 +19,42 @@ import torch.nn.functional as F
 
 
 def knn(x: torch.Tensor, k):
-    inner = -2*torch.matmul(x.transpose(2, 1), x)
-    xx = torch.sum(x**2, dim=1, keepdim=True)
-    pairwise_distance = -xx - inner - xx.transpose(2, 1)
+    # input x: B*F*N
+    inner = -2*torch.matmul(x.transpose(2, 1), x) # B*N*F * (B*F*N) -> B*N*N: -2*(每对点 x'*y)
+    xx = torch.sum(x**2, dim=1, keepdim=True) # B*N: x^2 每个点自身平方和
+    pairwise_distance = -xx - inner - xx.transpose(2, 1) # 每对点 x'*y 减去x平方和和y平方和 -> 每对点距离平方 -> B*N*N
  
-    idx = pairwise_distance.topk(k=k, dim=-1)[1]   # (batch_size, num_points, k)
-    return idx
+    idx = pairwise_distance.topk(k=k, dim=-1)[1]   # (batch_size, num_points, k) 
+    # 最小的k个距离 索引
+    return idx # B*N*k
 
 
-def get_graph_feature(x, k=20, idx=None):
-    # input size B*F*N ?
+def get_graph_feature(x:torch.Tensor, k=20, idx=None):
+    # input size B*F*N
     batch_size = x.size(0)
     num_points = x.size(2)
     x = x.view(batch_size, -1, num_points)  # input size B*F*N 没变吧
     if idx is None:
         idx = knn(x, k=k)   # (batch_size, num_points, k)
-    device = torch.device('cuda')
+    device = torch.device('cuda') # TODO: to be change in my implementation
 
-    idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1)*num_points
+    idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1)*num_points # B*1*1
 
-    idx = idx + idx_base
+    idx = idx + idx_base # global idx (batch_size, num_points, k)
+    # useless note # (batch_size, num_points, num_dims)  -> (batch_size*num_points, num_dims) 
+    # batch_size * num_points * k + range(0, batch_size*num_points)
 
-    idx = idx.view(-1)
+    idx = idx.view(-1) # B*N*K
  
-    _, num_dims, _ = x.size()
+    _, num_dims, _ = x.size() # num_dims = F
 
-    x = x.transpose(2, 1).contiguous()   # (batch_size, num_points, num_dims)  -> (batch_size*num_points, num_dims) #   batch_size * num_points * k + range(0, batch_size*num_points)
-    feature = x.view(batch_size*num_points, -1)[idx, :]
-    feature = feature.view(batch_size, num_points, k, num_dims) 
-    x = x.view(batch_size, num_points, 1, num_dims).repeat(1, 1, k, 1)
+    x = x.transpose(2, 1).contiguous() # size B*N*F
     
+    feature = x.view(batch_size*num_points, -1)[idx, :] # B*N*F -> BN * F -> (B*N*K) * F
+    feature = feature.view(batch_size, num_points, k, num_dims) # B*N*K*F
+    x = x.view(batch_size, num_points, 1, num_dims).repeat(1, 1, k, 1) # size B*N*K(rep)*F
+    
+    # size B*N*K*2F -> B*2F*N*K
     feature = torch.cat((feature-x, x), dim=3).permute(0, 3, 1, 2).contiguous()
   
     return feature
@@ -124,8 +130,8 @@ class DGCNN(nn.Module):
     def forward(self, x):
         # input size B*3*N
         batch_size = x.size(0)
-        x = get_graph_feature(x, k=self.k)
-        x = self.conv1(x)
+        x = get_graph_feature(x, k=self.k) # -> size B*6*N*k
+        x = self.conv1(x) # -> size B*64*N*k
         x1 = x.max(dim=-1, keepdim=False)[0]
 
         x = get_graph_feature(x1, k=self.k)
